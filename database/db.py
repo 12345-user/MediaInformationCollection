@@ -3,13 +3,15 @@
 database/db.py - SQLite 数据库操作
 存储创作者数据和视频指标
 """
-import sqlite3, json, sys
+import sqlite3, json, sys, os
 from pathlib import Path
 from datetime import datetime, timedelta
 
 sys.stdout.reconfigure(encoding="utf-8")
 
-DB_PATH = Path(r"D:\Tools\creator-monitor\data\metrics.db")
+# 跨平台路径：优先用环境变量，其次用项目根目录下的 data/
+_db_env = os.environ.get("CREATOR_MONITOR_DB", "")
+DB_PATH = Path(_db_env) if _db_env else Path(__file__).parent.parent / "data" / "metrics.db"
 
 
 def get_conn():
