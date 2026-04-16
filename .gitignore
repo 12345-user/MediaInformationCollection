@@ -1,0 +1,31 @@
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+dist/
+build/
+.eggs/
+
+# Virtual environment
+venv312/
+venv/
+
+# Data (don't commit DB and large data - they get generated locally)
+data/*.db
+data/*.json
+!data/.gitkeep
+
+# Streamlit
+.streamlit运行时缓存
+.streamlit/
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Logs
+*.log
+
+# IDE
+.vscode/
+.idea/

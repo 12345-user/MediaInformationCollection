@@ -1,0 +1,59 @@
+{
+  "creators": [
+    {
+      "id": "zhen_shu_ran_shao_bilibili",
+      "name": "帧数燃烧_B站",
+      "platform": "bilibili",
+      "uid": "3690994815994200",
+      "topic": "AI工具工作流",
+      "style": "快节奏工具演示"
+    },
+    {
+      "id": "chen_shi_fu_bilibili",
+      "name": "陈师傅路亚_B站",
+      "platform": "bilibili",
+      "uid": "434181042",
+      "topic": "路亚钓鱼",
+      "style": "真实记录/故事感"
+    },
+    {
+      "id": "zhen_shu_ran_shao_douyin",
+      "name": "帧数燃烧_抖音",
+      "platform": "douyin",
+      "uid": "25424815218",
+      "sec_uid": "MS4wLjABAAAAHxxxxxxxx",
+      "topic": "AI工具工作流",
+      "style": "快节奏工具演示"
+    },
+    {
+      "id": "bob_tong_xue_douyin",
+      "name": "Bob同学_抖音",
+      "platform": "douyin",
+      "uid": "baodi6611",
+      "sec_uid": "MS4wLjABAAAAYyyyyyyyy",
+      "topic": "AI学习/计算机专业",
+      "style": "知识干货/学生视角"
+    },
+    {
+      "id": "chen_shi_fu_douyin",
+      "name": "陈师傅路亚_抖音",
+      "platform": "douyin",
+      "uid": "MS4wLjABAAAAIaxl8QfBDEg6mEKha4dKNXM8JxtQQXADYHBmTYSvgNk",
+      "sec_uid": "MS4wLjABAAAAIaxl8QfBDEg6mEKha4dKNXM8JxtQQXADYHBmTYSvgNk",
+      "topic": "路亚/真实记录",
+      "style": "幽默风趣/真实故事"
+    },
+    {
+      "id": "chen_shi_fu_xiaohongshu",
+      "name": "陈师傅路亚_小红书",
+      "platform": "xiaohongshu",
+      "uid": "xxxxxxx",
+      "topic": "路亚钓鱼/户外",
+      "style": "真实故事"
+    }
+  ],
+  "settings": {
+    "collect_interval_hours": 6,
+    "data_retention_days": 90
+  }
+}
