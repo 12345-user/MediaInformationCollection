@@ -1,52 +1,6 @@
-# 🚀 创作者流量监控系统
+# 创作者流量监控系统
 
-> 多平台（抖音 / 小红书 / B站）博主作品流量实时监控 + 可视化网站
-
-**本地部署 + GitHub 免费托管（Streamlit Cloud）**
-
----
-
-## 系统架构
-
-```
-本地 PC（Cron 每6小时）
-  └─ collectors/run.py
-       ├─ bilibili.py（bili CLI）
-       ├─ douyin.py（Web API）
-       └─ xiaohongshu.py（xhs CLI）
-  └─ database/db.py（SQLite）
-       └─ data/latest_data.json（推送到 GitHub）
-
-GitHub Actions（每6小时自动采集）
-  └─ 同步 latest_data.json 到 main 分支
-
-GitHub（Streamlit Cloud 自动部署）
-  └─ dashboard/app.py → https://你的用户名-你的应用名.streamlit.app
-```
-
----
-
-## 目录结构
-
-```
-creator-monitor/
-├── creators.json           # 博主配置（修改这里添加博主）
-├── requirements.txt
-├── .streamlit/config.toml
-├── .github/workflows/collect.yml  # GitHub Actions 自动采集
-├── database/
-│   └── db.py              # SQLite 数据库操作
-├── collectors/
-│   ├── bilibili.py        # B站数据采集
-│   ├── douyin.py          # 抖音数据采集
-│   ├── xiaohongshu.py     # 小红书数据采集
-│   └── run.py              # 主采集脚本
-├── data/                  # 数据存储目录
-│   ├── metrics.db          # SQLite 数据库（本地）
-│   └── latest_data.json    # GitHub 同步数据
-└── dashboard/
-    └── app.py             # Streamlit 可视化网站
-```
+> 多平台博主作品实时监控 + 数据可视化
 
 ---
 
@@ -56,50 +10,64 @@ creator-monitor/
 
 ```bash
 cd D:\Tools\creator-monitor
+
+# 安装依赖
 pip install -r requirements.txt
 
-# 首次：初始化数据库
-python -c "from database.db import init_db; init_db()"
-
-# 采集数据
-python collectors/run.py
-
-# 启动本地监控网站
-streamlit run dashboard/app.py
+# 启动监控网站
+streamlit run streamlit_app.py
 # 访问 http://localhost:8501
 ```
 
-### 2. GitHub 部署（免费）
+### 2. GitHub 部署
 
-**Step 1**: 在 GitHub 创建新仓库，上传本项目代码
+1. 上传代码到 GitHub 仓库
+2. 登录 https://streamlit.io/cloud
+3. 选择仓库 + `streamlit_app.py` → Deploy
 
-**Step 2**: 登录 [Streamlit Cloud](https://streamlit.io/cloud)
-- 连接你的 GitHub 仓库
-- 选择 `dashboard/app.py` 作为主文件
-- 填写 `requirements.txt` 路径
-- 点击 **Deploy!**
+---
 
-**Step 3**: 获取免费 URL
+## 获取 Cookie（抖音/小红书必读）
+
+### 为什么要 Cookie？
+
+B站：✅ 无需 Cookie，直接采集
+抖音：❌ 需要登录 Cookie
+小红书：❌ 需要登录 Cookie
+
+### 步骤
+
+**Step 1：关闭 Chrome 浏览器**（重要！否则 Cookie 数据库被锁）
+
+**Step 2：运行 Cookie 提取工具**
+```bash
+python get_cookies.py
 ```
-https://你的用户名-你的项目名.streamlit.app
-```
 
-**Step 4**: 自动更新（可选）
-- 在 GitHub Actions 中启用 `collect.yml`
-- 设置仓库 secrets（如果需要 Cookie）
-- 每天自动采集数据并更新显示
+**Step 3：重启 Chrome，回到抖音/小红书重新登录**
+
+**Step 4：再次运行 `get_cookies.py`**
+```bash
+python get_cookies.py
+```
+Cookie 自动保存到 `data/douyin_cookies.json` 和 `data/xiaohongshu_cookies.json`
+
+### 提供 UID
+
+还需要提供各平台的用户 ID：
+- **抖音 UID**：抖音APP → 个人主页 → 分享 → 复制链接，链接里的数字
+- **小红书 UID**：小红书APP → 个人主页 → 分享 → 复制链接，获取主页 URL 中的用户ID
 
 ---
 
 ## 添加博主
 
 编辑 `creators.json`：
-
 ```json
 {
-  "id": "自定义唯一ID",
+  "id": "自定义ID",
   "name": "博主名称",
-  "platform": "douyin | bilibili | xiaohongshu",
+  "platform": "bilibili | douyin | xiaohongshu",
   "uid": "平台用户ID",
   "topic": "内容领域",
   "style": "内容风格"
@@ -108,59 +76,27 @@ https://你的用户名-你的项目名.streamlit.app
 
 ---
 
-## 定时采集（Cron）
+## 定时采集
 
-在 OpenClaw 中添加 Cron 任务：
+本地自动采集（每天 8:00 / 14:00 / 20:00）：
+- Cron 任务已配置在 OpenClaw
 
-```python
-# 每6小时采集一次
-cron.add(
-  name="创作者流量采集",
-  schedule={"kind": "cron", "expr": "0 8,14,20 * * *", "tz": "Asia/Shanghai"},
-  payload={"kind": "agentTurn",
-           "message": "执行创作者数据采集：python collectors/run.py",
-           "model": "minimax/MiniMax-M2.5"},
-  sessionTarget="isolated",
-)
-```
+GitHub Actions 自动采集（云端，每6小时）：
+- 推送代码后自动启用
 
 ---
 
-## 功能特性
+## 文件说明
 
-| 功能 | 状态 |
+| 文件 | 说明 |
 |------|------|
-| 多平台监控（抖音/小红书/B站） | ✅ |
-| 播放量/点赞/评论/转发追踪 | ✅ |
-| 30天趋势图 | ✅ |
-| 各平台对比分析 | ✅ |
-| 最新视频动态 | ✅ |
-| 博主详情页 | ✅ |
-| 本地 Streamlit 部署 | ✅ |
-| Streamlit Cloud 免费托管 | ✅ |
-| GitHub Actions 自动采集 | ✅ |
-| SQLite 本地持久化 | ✅ |
-| GitHub 数据同步 | ✅ |
-
----
-
-## 平台说明
-
-| 平台 | 采集方式 | 说明 |
-|------|---------|------|
-| **B站** | bili CLI（官方工具） | 最稳定，直接获取所有数据 |
-| **抖音** | Web API + 搜索 | 公开数据可能被限流，建议配置 Cookie |
-| **小红书** | xhs CLI | 需要登录 Cookie（agent-reach） |
-
----
-
-## 配置 Cookie（如需）
-
-如果抖音/小红书采集受限，在 `creators.json` 同目录创建 `config.json`：
-
-```json
-{
-  "douyin_cookie": "你的抖音Cookie",
-  "xiaohongshu_cookie": "你的小红书Cookie"
-}
-```
+| `streamlit_app.py` | Streamlit Cloud 入口 |
+| `dashboard/app.py` | 完整 Dashboard |
+| `collectors/run.py` | 主采集脚本 |
+| `collectors/bilibili.py` | B站采集（无需 Cookie） |
+| `collectors/douyin.py` | 抖音采集（需要 Cookie） |
+| `collectors/xiaohongshu.py` | 小红书采集（需要 Cookie） |
+| `database/db.py` | SQLite 数据库 |
+| `get_cookies.py` | Cookie 自动提取工具 |
+| `creators.json` | 博主配置 |
+| `data/*.json` | Cookie 和数据文件 |

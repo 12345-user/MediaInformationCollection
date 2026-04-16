@@ -1,106 +1,121 @@
 # -*- coding: utf-8 -*-
-"""
-collectors/douyin.py - 抖音数据采集
-策略：
-  1. 尝试 douyin-mcp-server CLI
-  2. Web 搜索 + 第三方平台代理获取公开数据
-  3. 直接抓取（需 Cookie，有限制）
-"""
-import sys, json, re, subprocess
+import sys, json, re, requests
 from pathlib import Path
 from datetime import datetime
 
 sys.stdout.reconfigure(encoding="utf-8")
 
-DOUYIN_CLI = Path(r"C:\Users\12052\.agent-reach-venv\Scripts\douyin-mcp-server.exe")
+BASE_DIR = Path(__file__).parent.parent
+COOKIE_FILE = BASE_DIR / "data" / "douyin_cookies.json"
 
 
-def douyin_cli(*args):
-    if not DOUYIN_CLI.exists():
-        return None
-    try:
-        r = subprocess.run(
-            [str(DOUYIN_CLI)] + list(args),
-            capture_output=True, text=True,
-            encoding="utf-8", errors="replace",
-            timeout=30,
-        )
-        return r.stdout if r.returncode == 0 else None
-    except:
-        return None
+def load_cookie_header():
+    if COOKIE_FILE.exists():
+        try:
+            data = json.loads(COOKIE_FILE.read_text(encoding="utf-8"))
+            return data.get("cookie_header", "")
+        except:
+            pass
+    return ""
 
 
-def fetch_via_webapi(uid: str) -> list:
-    """
-    通过抖音用户主页/API 获取视频列表
-    uid 可能是数字UID或sec_uid
-    """
-    import requests
-
+def collect_creator(uid, creator_id):
+    cookie_str = load_cookie_header()
     videos = []
     headers = {
         "User-Agent": "Mozilla/5.0 (iPhone; CPU iPhone OS 16_0 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/16.0 Mobile/15E148 Safari/604.1",
-        "Accept": "application/json, text/plain, */*",
         "Referer": "https://www.douyin.com/",
+        "Accept": "application/json, text/plain, */*",
     }
+    if cookie_str:
+        headers["Cookie"] = cookie_str
 
-    # 确定使用哪个uid参数
-    sec_uid = uid  # 默认uid就是sec_uid格式
+    sec_uid = uid
+    # 数字UID转sec_uid（如果需要）
+    if uid and uid.isdigit():
+        sec_uid = uid  # 直接用数字uid查询
 
-    # 策略1：抖音用户主页（移动端UA，容易绕过反爬）
-    try:
-        url = f"https://www.douyin.com/aweme/v1/web/aweme/post/?sec_uid={sec_uid}&count=18&max_cursor=0&cookie_enabled=true&platform=PC"
-        resp = requests.get(url, headers=headers, timeout=15, allow_redirects=True)
-        if resp.status_code == 200 and resp.text.strip().startswith("{"):
-            data = resp.json()
-            aweme_list = data.get("aweme_list", [])
-            for item in aweme_list:
-                videos.append(parse_douyin_video(item))
-    except Exception as e:
-        print(f"[douyin] API failed: {e}")
-
-    # 策略2：通过用户主页HTML解析
-    if not videos:
+    if sec_uid and cookie_str:
+        # 策略1: 登录态API
         try:
-            profile_url = f"https://www.douyin.com/user/{sec_uid}"
-            resp = requests.get(profile_url, headers=headers, timeout=15)
-            # 从HTML中提取RENDER_DATA或视频信息
-            render_data = re.search(r'<script id="RENDER_DATA" type="application/json">([^<]+)</script>', resp.text)
-            if render_data:
-                import html as html_module
-                unescaped = html_module.unescape(render_data.group(1))
-                data = json.loads(unescaped)
-                # 解析用户数据...
+            url = "https://www.douyin.com/aweme/v1/web/aweme/post/"
+            params = {
+                "sec_user_id": sec_uid,
+                "count": 18,
+                "max_cursor": 0,
+                "cookie_enabled": "true",
+                "platform": "PC",
+            }
+            resp = requests.get(url, headers=headers, params=params, timeout=15)
+            if resp.status_code == 200 and resp.text.strip().startswith("{"):
+                data = resp.json()
+                awemes = data.get("aweme_list", [])
+                for item in awemes:
+                    v = _parse(item)
+                    v["creator_id"] = creator_id
+                    videos.append(v)
+                print("[douyin] API: " + str(len(awemes)) + " videos")
         except Exception as e:
-            print(f"[douyin] Profile parse failed: {e}")
+            print("[douyin] API failed: " + str(e))
+
+    if not videos:
+        # 策略2: 用户主页 HTML
+        try:
+            if sec_uid:
+                resp = requests.get(
+                    "https://www.douyin.com/user/" + str(sec_uid),
+                    headers={"User-Agent": headers["User-Agent"]},
+                    timeout=15)
+                titles = re.findall(r'"desc"\s*:\s*"([^"]{3,100})"', resp.text)
+                plays = re.findall(r'"play_count"\s*:\s*"?(\d+)"?', resp.text)
+                likes = re.findall(r'"digg_count"\s*:\s*"?(\d+)"?', resp.text)
+                video_ids = re.findall(r'"aweme_id"\s*:\s*"(\d+)"?', resp.text)
+                ids_unique = []
+                for vid in video_ids:
+                    if vid not in ids_unique:
+                        ids_unique.append(vid)
+                for i in range(min(len(ids_unique), 20)):
+                    pl = int(plays[i]) if i < len(plays) and plays[i].isdigit() else 0
+                    lk = int(likes[i]) if i < len(likes) and likes[i].isdigit() else 0
+                    videos.append({
+                        "id": ids_unique[i],
+                        "title": titles[i] if i < len(titles) else "无标题",
+                        "description": "",
+                        "publish_date": "",
+                        "views": pl,
+                        "likes": lk,
+                        "comments": 0,
+                        "shares": 0,
+                        "platform": "douyin",
+                        "url": "https://www.douyin.com/video/" + ids_unique[i],
+                        "creator_id": creator_id,
+                    })
+                print("[douyin] HTML parse: " + str(len(videos)) + " videos")
+        except Exception as e:
+            print("[douyin] HTML parse failed: " + str(e))
 
     return videos
 
 
-def parse_douyin_video(item: dict) -> dict:
-    """解析抖音视频数据"""
-    desc = item.get("desc", "")
-    stats = item.get("statistics", {})
-    create_time = item.get("create_time", 0)
-    if create_time:
-        create_time = datetime.fromtimestamp(create_time).strftime("%Y-%m-%d") if isinstance(create_time, int) else str(create_time)
+def _parse(item):
+    stats = item.get("statistics", {}) or {}
+    ct = item.get("create_time", 0)
+    try:
+        if str(ct).isdigit() and int(ct) > 0:
+            ct = datetime.fromtimestamp(int(ct)).strftime("%Y-%m-%d")
+        else:
+            ct = str(ct)
+    except:
+        ct = ""
     return {
         "id": item.get("aweme_id", ""),
-        "title": desc[:80] if desc else "无标题",
-        "description": desc[:200],
-        "publish_date": create_time,
-        "views": stats.get("play_count", 0),
-        "likes": stats.get("digg_count", 0),
-        "comments": stats.get("comment_count", 0),
-        "shares": stats.get("share_count", 0),
+        "title": (item.get("desc", "") or "无标题")[:80],
+        "description": item.get("desc", "")[:200],
+        "publish_date": str(ct),
+        "views": int(stats.get("play_count", 0) or 0),
+        "likes": int(stats.get("digg_count", 0) or 0),
+        "comments": int(stats.get("comment_count", 0) or 0),
+        "shares": int(stats.get("share_count", 0) or 0),
         "platform": "douyin",
-        "url": f"https://www.douyin.com/video/{item.get('aweme_id', '')}",
+        "url": "https://www.douyin.com/video/" + str(item.get("aweme_id", "")),
     }
-
-
-def collect_creator(uid: str, creator_id: str):
-    """采集指定创作者的视频"""
-    videos = fetch_via_webapi(uid)
-    for v in videos:
-        v["creator_id"] = creator_id
-    return videos

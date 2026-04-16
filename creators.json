@@ -21,7 +21,6 @@
       "name": "帧数燃烧_抖音",
       "platform": "douyin",
       "uid": "25424815218",
-      "sec_uid": "MS4wLjABAAAAHxxxxxxxx",
       "topic": "AI工具工作流",
       "style": "快节奏工具演示"
     },
@@ -30,7 +29,6 @@
       "name": "Bob同学_抖音",
       "platform": "douyin",
       "uid": "baodi6611",
-      "sec_uid": "MS4wLjABAAAAYyyyyyyyy",
       "topic": "AI学习/计算机专业",
       "style": "知识干货/学生视角"
     },
@@ -38,22 +36,9 @@
       "id": "chen_shi_fu_douyin",
       "name": "陈师傅路亚_抖音",
       "platform": "douyin",
-      "uid": "MS4wLjABAAAAIaxl8QfBDEg6mEKha4dKNXM8JxtQQXADYHBmTYSvgNk",
-      "sec_uid": "MS4wLjABAAAAIaxl8QfBDEg6mEKha4dKNXM8JxtQQXADYHBmTYSvgNk",
+      "uid": "25424815218",
       "topic": "路亚/真实记录",
       "style": "幽默风趣/真实故事"
-    },
-    {
-      "id": "chen_shi_fu_xiaohongshu",
-      "name": "陈师傅路亚_小红书",
-      "platform": "xiaohongshu",
-      "uid": "xxxxxxx",
-      "topic": "路亚钓鱼/户外",
-      "style": "真实故事"
     }
-  ],
-  "settings": {
-    "collect_interval_hours": 6,
-    "data_retention_days": 90
-  }
+  ]
 }
