@@ -8,6 +8,13 @@ import sys, json
 from pathlib import Path
 from datetime import datetime, timedelta
 
+# 加载内嵌数据（B站采集的23个视频）
+try:
+    from _embedded_data import EMBEDDED_DATA
+    CLOUD_DATA = EMBEDDED_DATA
+except ImportError:
+    CLOUD_DATA = None
+
 import streamlit as st
 import pandas as pd
 import plotly.express as px
@@ -38,7 +45,9 @@ div[data-testid="stMetricValue"] { color: #4fd1c5; font-size: 2em; }
 # ========== 数据加载 ==========
 @st.cache_data(ttl=3600)
 def load_github_data():
-    """从 GitHub 同步的 latest_data.json 加载"""
+    """优先用内嵌数据，其次用本地JSON文件"""
+    if CLOUD_DATA:
+        return CLOUD_DATA
     if GITHUB_DATA.exists():
         try:
             return json.loads(GITHUB_DATA.read_text(encoding="utf-8"))
