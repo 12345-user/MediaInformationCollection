@@ -65,20 +65,19 @@ def load_creators_config():
     return []
 
 def get_db_videos():
-    """从 SQLite 读取数据"""
+    """从 SQLite 读取数据（移除30天限制，读取全部）"""
     try:
         import sqlite3
         conn = sqlite3.connect(str(DB_PATH), check_same_thread=False)
         conn.row_factory = sqlite3.Row
         c = conn.cursor()
-        cutoff = (datetime.now() - timedelta(days=30)).isoformat()
         rows = c.execute(
-            "SELECT * FROM videos WHERE collected_at>=? ORDER BY collected_at DESC LIMIT 500",
-            (cutoff,)
+            "SELECT * FROM videos ORDER BY collected_at DESC LIMIT 1000"
         ).fetchall()
         conn.close()
-        return [dict(r) for r in rows]
-    except:
+        result = [dict(r) for r in rows]
+        return result
+    except Exception as e:
         return []
 
 def get_db_creators():
@@ -146,11 +145,25 @@ def main():
             st.cache_data.clear()
             st.rerun()
 
-    # 过滤
+    # 过滤（支持中文平台名）
     filtered_v = all_videos
+    # 平台名映射：统一大小写
+    platform_aliases = {
+        '抖音': ['抖音', 'douyin'],
+        'B站': ['B站', 'bilibili'],
+        '小红书': ['小红书', 'xiaohongshu'],
+    }
+    def match_platform(c_platform, sel):
+        if sel == '全部': return True
+        for alias in platform_aliases.get(sel, [sel]):
+            if c_platform == alias:
+                return True
+        return c_platform == sel
+
     if sel_platform != "全部":
         cid_map = {c["id"]: c["platform"] for c in all_creators}
-        filtered_v = [v for v in filtered_v if cid_map.get(v.get("creator_id","")) == sel_platform]
+        filtered_v = [v for v in filtered_v
+                     if match_platform(cid_map.get(v.get("creator_id",""), ""), sel_platform)]
     if sel_creator != "全部":
         cid_map = {c["name"]: c["id"] for c in all_creators}
         cid = cid_map.get(sel_creator, "")
@@ -179,14 +192,14 @@ def main():
             grp = df.groupby("平台")["views"].sum().reset_index()
             fig1 = px.bar(grp, x="平台", y="views", title="各平台播放量",
                           color="平台",
-                          color_discrete_map={"douyin": "#ff6b6b", "bilibili": "#4ecdc4", "xiaohongshu": "#ffe66d"})
+                          color_discrete_map={"抖音": "#ff6b6b", "douyin": "#ff6b6b", "B站": "#4ecdc4", "bilibili": "#4ecdc4", "小红书": "#ffe66d", "xiaohongshu": "#ffe66d"})
             fig1.update_layout(plot_bgcolor="#1a1d27", paper_bgcolor="#0f1117",
                              font_color="#e0e0e0", showlegend=False)
             st.plotly_chart(fig1, use_container_width=True)
         with col_b:
             fig2 = px.pie(grp, names="平台", values="views", title="播放量占比", hole=0.4,
                           color="平台",
-                          color_discrete_map={"douyin": "#ff6b6b", "bilibili": "#4ecdc4", "xiaohongshu": "#ffe66d"})
+                          color_discrete_map={"抖音": "#ff6b6b", "douyin": "#ff6b6b", "B站": "#4ecdc4", "bilibili": "#4ecdc4", "小红书": "#ffe66d", "xiaohongshu": "#ffe66d"})
             fig2.update_layout(plot_bgcolor="#1a1d27", paper_bgcolor="#0f1117", font_color="#e0e0e0")
             st.plotly_chart(fig2, use_container_width=True)
 
