@@ -1,25 +1,21 @@
 # -*- coding: utf-8 -*-
 """
-streamlit_app.py — 创作者流量监控系统
-Streamlit Cloud 部署入口
-本地: streamlit run streamlit_app.py
+streamlit_app.py — 创作者流量监控系统 v2
+直接从 SQLite 数据库读取，逻辑简化
 """
-import sys, json
+import json
 from pathlib import Path
 from datetime import datetime, timedelta
-
-# 加载内嵌数据（B站采集的23个视频）
-try:
-    from _embedded_data import EMBEDDED_DATA
-    CLOUD_DATA = EMBEDDED_DATA
-except ImportError:
-    CLOUD_DATA = None
 
 import streamlit as st
 import pandas as pd
 import plotly.express as px
-import plotly.graph_objects as go
 
+# ========== 数据库路径 ==========
+BASE_DIR = Path(__file__).parent
+DB_PATH = BASE_DIR / "data" / "metrics.db"
+
+# ========== 配置 ==========
 st.set_page_config(
     page_title="创作者流量监控",
     page_icon="📊",
@@ -27,13 +23,6 @@ st.set_page_config(
     initial_sidebar_state="expanded",
 )
 
-# ========== 数据库兼容路径 ==========
-BASE_DIR = Path(__file__).parent
-DB_PATH = BASE_DIR / "data" / "metrics.db"
-GITHUB_DATA = BASE_DIR / "data" / "latest_data.json"
-CREATORS_FILE = BASE_DIR / "creators.json"
-
-# ========== 样式 ==========
 st.markdown("""
 <style>
 .stApp { background-color: #0f1117; color: #e0e0e0; }
@@ -42,194 +31,164 @@ div[data-testid="stMetricValue"] { color: #4fd1c5; font-size: 2em; }
 </style>
 """, unsafe_allow_html=True)
 
+
 # ========== 数据加载 ==========
-@st.cache_data(ttl=3600)
-def load_github_data():
-    """优先用内嵌数据，其次用本地JSON文件"""
-    if CLOUD_DATA:
-        return CLOUD_DATA
-    if GITHUB_DATA.exists():
-        try:
-            return json.loads(GITHUB_DATA.read_text(encoding="utf-8"))
-        except:
-            pass
-    return None
+def get_db_creators():
+    import sqlite3
+    conn = sqlite3.connect(str(DB_PATH), check_same_thread=False)
+    conn.row_factory = sqlite3.Row
+    rows = conn.execute("SELECT * FROM creators ORDER BY platform, name").fetchall()
+    conn.close()
+    return [dict(r) for r in rows]
 
-@st.cache_data(ttl=3600)
-def load_creators_config():
-    if CREATORS_FILE.exists():
-        try:
-            return json.loads(CREATORS_FILE.read_text(encoding="utf-8")).get("creators", [])
-        except:
-            pass
-    return []
 
-def get_db_videos():
-    """从 SQLite 读取数据（移除30天限制，读取全部）"""
-    try:
-        import sqlite3
-        conn = sqlite3.connect(str(DB_PATH), check_same_thread=False)
-        conn.row_factory = sqlite3.Row
-        c = conn.cursor()
-        rows = c.execute(
+def get_db_videos(creator_id=None):
+    import sqlite3
+    conn = sqlite3.connect(str(DB_PATH), check_same_thread=False)
+    conn.row_factory = sqlite3.Row
+    if creator_id:
+        rows = conn.execute(
+            "SELECT * FROM videos WHERE creator_id=? ORDER BY collected_at DESC",
+            (creator_id,)
+        ).fetchall()
+    else:
+        rows = conn.execute(
             "SELECT * FROM videos ORDER BY collected_at DESC LIMIT 1000"
         ).fetchall()
-        conn.close()
-        result = [dict(r) for r in rows]
-        return result
-    except Exception as e:
-        return []
+    conn.close()
+    result = [dict(r) for r in rows]
+    # 写日志到文件，方便排查
+    log_path = BASE_DIR / "debug_log.txt"
+    with open(log_path, "w", encoding="utf-8") as f:
+        f.write(f"[{datetime.now()}] get_db_videos called, creator_id={creator_id}, returned {len(result)} videos\n")
+        for r in result[:3]:
+            f.write(f"  sample: {r.get('creator_id')} | {str(r.get('title',''))[:30]}\n")
+    return result
 
-def get_db_creators():
-    try:
-        import sqlite3
-        conn = sqlite3.connect(str(DB_PATH), check_same_thread=False)
-        conn.row_factory = sqlite3.Row
-        c = conn.cursor()
-        rows = c.execute("SELECT * FROM creators").fetchall()
-        conn.close()
-        return [dict(r) for r in rows]
-    except:
-        return []
-
-def get_db_daily():
-    try:
-        import sqlite3
-        conn = sqlite3.connect(str(DB_PATH), check_same_thread=False)
-        conn.row_factory = sqlite3.Row
-        c = conn.cursor()
-        cutoff = (datetime.now() - timedelta(days=30)).strftime("%Y-%m-%d")
-        rows = c.execute("""
-            SELECT d.date, d.creator_id, c.name, c.platform,
-                   SUM(d.views) as total_views, SUM(d.likes) as total_likes,
-                   COUNT(DISTINCT d.video_id) as video_count
-            FROM daily_stats d
-            JOIN creators c ON d.creator_id = c.id
-            WHERE d.date>=?
-            GROUP BY d.date, d.creator_id
-            ORDER BY d.date, total_views DESC
-        """, (cutoff,)).fetchall()
-        conn.close()
-        return [dict(r) for r in rows]
-    except:
-        return []
 
 # ========== 主程序 ==========
-def main():
-    st.title("🚨 创作者流量实时监控")
-    st.caption(f"数据更新: {datetime.now().strftime('%Y-%m-%d %H:%M')}")
+creators = get_db_creators()
+all_videos = get_db_videos()
 
-    # 加载数据
-    creators_cfg = load_creators_config()
-    data = load_github_data()
-    db_videos = get_db_videos()
-    db_creators = get_db_creators()
-    db_daily = get_db_daily()
+st.title("🚨 创作者流量实时监控")
+st.caption(f"数据时间: {datetime.now().strftime('%Y-%m-%d %H:%M')} · 数据库视频: {len(all_videos)} 条 · 创作者: {len(creators)} 位")
 
-    # 合并数据源
-    all_creators = db_creators or [{"id": c["id"], "name": c["name"], "platform": c["platform"]} for c in creators_cfg]
-    all_videos = db_videos
-    if not all_videos and data:
-        all_videos = data.get("recent_videos", [])
+# 调试信息（直接显示在顶部）
+debug_info = {
+    "DB视频总数": len(all_videos),
+    "DB创作者": [(c["id"], c["name"], c["platform"]) for c in creators[:6]],
+    "视频creator_id样本": list(set(v.get("creator_id","") for v in all_videos[:20])),
+}
+with st.expander("🔧 调试信息"):
+    st.write(debug_info)
 
-    # 侧边栏过滤
-    with st.sidebar:
-        st.title("📊 配置")
-        platforms = ["全部"] + list(set(c.get("platform","") for c in all_creators))
-        sel_platform = st.selectbox("平台", platforms)
-        creator_names = [c["name"] for c in all_creators
-                        if sel_platform == "全部" or c.get("platform") == sel_platform]
-        sel_creator = st.selectbox("博主", ["全部"] + creator_names)
-        days = st.slider("时间范围（天）", 7, 90, 30)
-        if st.button("🔄 刷新"):
-            st.cache_data.clear()
-            st.rerun()
+# 侧边栏
+with st.sidebar:
+    st.title("📊 配置")
 
-    # 过滤（支持中文平台名）
-    filtered_v = all_videos
-    # 平台名映射：统一大小写
-    platform_aliases = {
-        '抖音': ['抖音', 'douyin'],
-        'B站': ['B站', 'bilibili'],
-        '小红书': ['小红书', 'xiaohongshu'],
-    }
-    def match_platform(c_platform, sel):
-        if sel == '全部': return True
-        for alias in platform_aliases.get(sel, [sel]):
-            if c_platform == alias:
-                return True
-        return c_platform == sel
+    # 平台选择
+    platforms = ["全部"] + sorted(set(c.get("platform","") for c in creators))
+    sel_platform = st.selectbox("平台", platforms)
 
-    if sel_platform != "全部":
-        cid_map = {c["id"]: c["platform"] for c in all_creators}
-        filtered_v = [v for v in filtered_v
-                     if match_platform(cid_map.get(v.get("creator_id",""), ""), sel_platform)]
-    if sel_creator != "全部":
-        cid_map = {c["name"]: c["id"] for c in all_creators}
-        cid = cid_map.get(sel_creator, "")
-        filtered_v = [v for v in filtered_v if v.get("creator_id","") == cid]
+    # 博主选择
+    filtered_creators = [c for c in creators if sel_platform == "全部" or c.get("platform") == sel_platform]
+    creator_names = [c["name"] for c in filtered_creators]
+    sel_creator = st.selectbox("博主", ["全部"] + creator_names)
 
-    df = pd.DataFrame(filtered_v) if filtered_v else pd.DataFrame()
+    # 时间范围
+    days = st.slider("时间范围（天）", 7, 90, 30)
 
-    # ========== 概览 ==========
-    st.markdown("## 📈 概览")
+    # 刷新按钮
+    if st.button("🔄 清除缓存刷新"):
+        st.cache_data.clear()
+        st.rerun()
+
+# 过滤视频
+filtered_videos = all_videos
+if sel_creator != "全部":
+    cid_map = {c["name"]: c["id"] for c in creators}
+    sel_id = cid_map.get(sel_creator, "")
+    filtered_videos = [v for v in filtered_videos if v.get("creator_id") == sel_id]
+elif sel_platform != "全部":
+    # 平台过滤：creator_id → platform 映射
+    cid_to_platform = {c["id"]: c["platform"] for c in creators}
+    filtered_videos = [v for v in filtered_videos
+                       if cid_to_platform.get(v.get("creator_id","")) == sel_platform]
+
+# 创建 DataFrame
+df = pd.DataFrame(filtered_videos) if filtered_videos else pd.DataFrame()
+
+# ========== 概览 ==========
+st.markdown("## 📈 概览")
+if not df.empty and "views" in df.columns:
     col1, col2, col3, col4 = st.columns(4)
-    with col1:
-        st.metric("👁 总播放", f"{int(df['views'].sum()):,}" if not df.empty and "views" in df else "暂无")
-    with col2:
-        st.metric("❤️ 总点赞", f"{int(df['likes'].sum()):,}" if not df.empty and "likes" in df else "暂无")
-    with col3:
-        st.metric("💬 总评论", f"{int(df['comments'].sum()):,}" if not df.empty and "comments" in df else "暂无")
-    with col4:
-        st.metric("🎬 监控博主", len(all_creators))
+    with col1: st.metric("👁 总播放", f"{int(df['views'].sum()):,}")
+    with col2: st.metric("❤️ 总点赞", f"{int(df['likes'].sum()):,}")
+    with col3: st.metric("💬 总评论", f"{int(df['comments'].sum()):,}")
+    with col4: st.metric("🎬 视频数", len(df))
+else:
+    col1, col2, col3, col4 = st.columns(4)
+    with col1: st.metric("👁 总播放", "暂无" if df.empty else f"{int(df['likes'].sum()):,}")
+    with col2: st.metric("❤️ 总点赞", f"{int(df['likes'].sum()):,}" if not df.empty else "暂无")
+    with col3: st.metric("💬 总评论", f"{int(df['comments'].sum()):,}" if not df.empty else "暂无")
+    with col4: st.metric("🎬 视频数", len(df))
 
-    # ========== 图表 ==========
-    if not df.empty and "views" in df.columns:
+# ========== 图表 ==========
+if not df.empty:
+    # 平台分布
+    cid_to_platform = {c["id"]: c["platform"] for c in creators}
+    df["平台"] = df["creator_id"].map(cid_to_platform).fillna("其他")
+
+    if "views" in df.columns and df["views"].sum() > 0:
         col_a, col_b = st.columns(2)
         with col_a:
-            platform_map = {c["id"]: c["platform"] for c in all_creators}
-            df["平台"] = df["creator_id"].map(platform_map).fillna("其他")
             grp = df.groupby("平台")["views"].sum().reset_index()
             fig1 = px.bar(grp, x="平台", y="views", title="各平台播放量",
                           color="平台",
-                          color_discrete_map={"抖音": "#ff6b6b", "douyin": "#ff6b6b", "B站": "#4ecdc4", "bilibili": "#4ecdc4", "小红书": "#ffe66d", "xiaohongshu": "#ffe66d"})
+                          color_discrete_map={"抖音": "#ff6b6b", "douyin": "#ff6b6b",
+                                           "B站": "#4ecdc4", "bilibili": "#4ecdc4",
+                                           "小红书": "#ffe66d"})
             fig1.update_layout(plot_bgcolor="#1a1d27", paper_bgcolor="#0f1117",
                              font_color="#e0e0e0", showlegend=False)
             st.plotly_chart(fig1, use_container_width=True)
         with col_b:
             fig2 = px.pie(grp, names="平台", values="views", title="播放量占比", hole=0.4,
                           color="平台",
-                          color_discrete_map={"抖音": "#ff6b6b", "douyin": "#ff6b6b", "B站": "#4ecdc4", "bilibili": "#4ecdc4", "小红书": "#ffe66d", "xiaohongshu": "#ffe66d"})
+                          color_discrete_map={"抖音": "#ff6b6b", "douyin": "#ff6b6b",
+                                           "B站": "#4ecdc4", "bilibili": "#4ecdc4",
+                                           "小红书": "#ffe66d"})
             fig2.update_layout(plot_bgcolor="#1a1d27", paper_bgcolor="#0f1117", font_color="#e0e0e0")
             st.plotly_chart(fig2, use_container_width=True)
 
-    # ========== 最新视频 ==========
-    st.markdown("### 🆕 最新视频动态")
+    # ========== 视频列表 ==========
+    st.markdown(f"### 📋 视频列表 ({len(df)} 条)")
+
     if not df.empty:
-        show_cols = [c for c in ["title", "views", "likes", "comments", "publish_date"] if c in df.columns]
+        # 选择要显示的列
+        col_map = {"title": "标题", "likes": "点赞", "comments": "评论",
+                   "shares": "转发", "views": "播放", "publish_date": "发布时间",
+                   "creator_id": "账号ID", "collected_at": "采集时间"}
+        show_cols = [c for c in ["title", "likes", "comments", "shares", "views", "publish_date"] if c in df.columns]
         if show_cols:
             disp = df[show_cols].copy()
-            disp.columns = [c.capitalize() for c in disp.columns]
-            st.dataframe(disp.head(20), use_container_width=True, hide_index=True)
+            disp.columns = [col_map.get(c, c) for c in disp.columns]
+            # 格式化数字
+            for col in ["点赞", "评论", "转发", "播放"]:
+                if col in disp.columns:
+                    disp[col] = disp[col].apply(lambda x: f"{int(x):,}" if pd.notna(x) else "0")
+            st.dataframe(disp.head(30), use_container_width=True, hide_index=True)
 
-    # ========== 博主列表 ==========
-    st.markdown("### 👤 博主列表")
-    if all_creators:
-        for c in all_creators:
-            with st.expander(f"{c['name']} ({c.get('platform','?')})"):
-                cv = [v for v in filtered_v if v.get("creator_id") == c["id"]]
-                c1, c2, c3 = st.columns(3)
-                with c1:
-                    st.metric("播放", f"{int(sum(v.get('views',0) for v in cv)):,}" if cv else "0")
-                with c2:
-                    st.metric("点赞", f"{int(sum(v.get('likes',0) for v in cv)):,}" if cv else "0")
-                with c3:
-                    st.metric("视频数", len(cv))
+# ========== 博主详情 ==========
+if sel_creator != "全部":
+    sel_c = next((c for c in creators if c["name"] == sel_creator), None)
+    if sel_c:
+        st.markdown(f"### 👤 {sel_c['name']} 详情")
+        c1, c2, c3, c4 = st.columns(4)
+        creator_videos = [v for v in all_videos if v.get("creator_id") == sel_c["id"]]
+        with c1: st.metric("平台", sel_c.get("platform","?"))
+        with c2: st.metric("视频数", len(creator_videos))
+        with c3: st.metric("UID", str(sel_c.get("uid",""))[:12])
+        with c4: st.metric("总点赞", f"{int(sum(v.get('likes',0) for v in creator_videos)):,}")
 
-    # ========== 页脚 ==========
-    st.markdown("---")
-    src = "GitHub同步" if GITHUB_DATA.exists() else "本地数据库"
-    st.caption(f"🚀 创作者流量监控系统 · {src} · 共监控 {len(all_creators)} 位博主 · {datetime.now().strftime('%Y-%m-%d')}")
-
-if __name__ == "__main__":
-    main()
+st.markdown("---")
+st.caption(f"🚀 创作者流量监控系统 · 共 {len(creators)} 位博主 · {datetime.now().strftime('%Y-%m-%d %H:%M')}")
