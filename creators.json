@@ -25,10 +25,21 @@
       "style": "快节奏工具演示"
     },
     {
-      "id": "bob_tong_xue_douyin",
-      "name": "Bob同学_抖音",
+      "id": "bob_douyin",
+      "name": "Bob同学",
       "platform": "douyin",
-      "uid": "baodi6611",
+      "uid": "109010065450",
+      "sec_uid": "MS4wLjABAAAAcDjz7QQqVdHuVVS6u6VUd2X6LrzCv-PvxF2ruApz3F4",
+      "url": "https://www.douyin.com/user/MS4wLjABAAAAcDjz7QQqVdHuVVS6u6VUd2X6LrzCv-PvxF2ruApz3F4",
+      "topic": "AI学习/计算机专业",
+      "style": "知识干货/学生视角"
+    },
+    {
+      "id": "bob_bilibili",
+      "name": "Bob同学_",
+      "platform": "bilibili",
+      "uid": "49997391",
+      "url": "https://space.bilibili.com/49997391",
       "topic": "AI学习/计算机专业",
       "style": "知识干货/学生视角"
     },
