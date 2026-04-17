@@ -1,38 +1,16 @@
 {
   "creators": [
     {
-      "id": "zhen_shu_ran_shao_bilibili",
-      "name": "帧数燃烧_B站",
-      "platform": "bilibili",
-      "uid": "3690994815994200",
-      "topic": "AI工具工作流",
-      "style": "快节奏工具演示"
-    },
-    {
-      "id": "chen_shi_fu_bilibili",
-      "name": "陈师傅路亚_B站",
-      "platform": "bilibili",
-      "uid": "434181042",
-      "topic": "路亚钓鱼",
-      "style": "真实记录/故事感"
-    },
-    {
-      "id": "zhen_shu_ran_shao_douyin",
-      "name": "帧数燃烧_抖音",
-      "platform": "douyin",
-      "uid": "25424815218",
-      "topic": "AI工具工作流",
-      "style": "快节奏工具演示"
-    },
-    {
       "id": "bob_douyin",
       "name": "Bob同学",
       "platform": "douyin",
       "uid": "109010065450",
-      "sec_uid": "MS4wLjABAAAAcDjz7QQqVdHuVVS6u6VUd2X6LrzCv-PvxF2ruApz3F4",
       "url": "https://www.douyin.com/user/MS4wLjABAAAAcDjz7QQqVdHuVVS6u6VUd2X6LrzCv-PvxF2ruApz3F4",
-      "topic": "AI学习/计算机专业",
-      "style": "知识干货/学生视角"
+      "topic": "AI学习",
+      "style": "知识干货",
+      "followers": 189821,
+      "total_videos": 83,
+      "total_likes": 486012
     },
     {
       "id": "bob_bilibili",
@@ -40,16 +18,56 @@
       "platform": "bilibili",
       "uid": "49997391",
       "url": "https://space.bilibili.com/49997391",
-      "topic": "AI学习/计算机专业",
-      "style": "知识干货/学生视角"
+      "topic": "AI学习",
+      "style": "知识干货",
+      "total_videos": 25,
+      "total_views": 117396
     },
     {
       "id": "chen_shi_fu_douyin",
-      "name": "陈师傅路亚_抖音",
+      "name": "陈师傅路亚",
       "platform": "douyin",
-      "uid": "25424815218",
-      "topic": "路亚/真实记录",
-      "style": "幽默风趣/真实故事"
+      "uid": "64158499725",
+      "url": "https://www.douyin.com/user/MS4wLjABAAAAIaxl8QfBDEg6mEKha4dKNXM8JxtQQXADYHBmTYSvgNk",
+      "topic": "路亚钓鱼",
+      "style": "真实记录/故事感",
+      "followers": 2735181,
+      "total_videos": 234,
+      "total_likes": 24049082
+    },
+    {
+      "id": "chen_shi_fu_bilibili",
+      "name": "陈师傅路亚_B站",
+      "platform": "bilibili",
+      "uid": "434181042",
+      "url": "https://space.bilibili.com/434181042",
+      "topic": "路亚钓鱼",
+      "style": "真实记录",
+      "total_videos": 10,
+      "total_views": 3018778
+    },
+    {
+      "id": "zhen_shu_ran_shao_douyin",
+      "name": "帧数燃烧",
+      "platform": "douyin",
+      "uid": "1259375910467531",
+      "url": "https://www.douyin.com/user/MS4wLjABAAAAflFs8DkU0tE6zIZauXozRVPZJFUSJ8knXd60De7L2snDAI2gEMob4NimkI5idVia",
+      "topic": "AI工具工作流",
+      "style": "快节奏工具演示",
+      "followers": 61688,
+      "total_videos": 1,
+      "total_likes": 471030
+    },
+    {
+      "id": "zhen_shu_ran_shao_bilibili",
+      "name": "帧数燃烧_B站",
+      "platform": "bilibili",
+      "uid": "3690994815994200",
+      "url": "https://space.bilibili.com/3690994815994200",
+      "topic": "AI工具工作流",
+      "style": "快节奏演示",
+      "total_videos": 4,
+      "total_views": 3142269
     }
   ]
 }
